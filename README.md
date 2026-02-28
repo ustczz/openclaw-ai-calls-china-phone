@@ -39,7 +39,7 @@ echo '{ "steponeai_api_key": "sk_xxxxxxxxxxxxx" }' > ~/.clawd/secrets.json
 ### 4.1 发起外呼
 
 ```bash
-{baseDir}/scripts/callout.sh <手机号> <外呼需求>
+./callout.sh <手机号> <外呼需求>
 ```
 
 **参数说明：**
@@ -61,7 +61,7 @@ echo '{ "steponeai_api_key": "sk_xxxxxxxxxxxxx" }' > ~/.clawd/secrets.json
 ### 4.2 查询通话记录
 
 ```bash
-{baseDir}/scripts/callinfo.sh <call_id> [最大重试次数]
+./callinfo.sh <call_id> [最大重试次数]
 ```
 
 **参数说明：**
@@ -171,7 +171,7 @@ echo '{ "steponeai_api_key": "sk_xxxxxxxxxxxxx" }' > ~/.clawd/secrets.json
 ### 4.1 Initiate Outbound Call
 
 ```bash
-{baseDir}/scripts/callout.sh <phone_number> <call_requirement>
+./callout.sh <phone_number> <call_requirement>
 ```
 
 **Parameter Description:**
@@ -193,7 +193,7 @@ echo '{ "steponeai_api_key": "sk_xxxxxxxxxxxxx" }' > ~/.clawd/secrets.json
 ### 4.2 Query Call Records
 
 ```bash
-{baseDir}/scripts/callinfo.sh <call_id> [max_retry_count]
+./callinfo.sh <call_id> [max_retry_count]
 ```
 
 **Parameter Description:**
