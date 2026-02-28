@@ -1,9 +1,8 @@
-#可以拨打中国的电话号码的机器人外呼(ai call)
+# 可以拨打中国的电话号码的机器人外呼(ai call)
 description: 可以拨打中国电话号码的机器人外呼, 专为openclaw(龙虾)用户打造的专业ai呼叫能力,只要一个prompt就可以帮你打电话干活了，支持查看电话对话记录，查看电话状态等。
 
 # Stepone AI 电话外呼
 
-- **github**：https://github.com/ustczz/openclaw-ai-calls-china-phone
 ## 1. 注册账号
 
 访问 Stepone AI 官网注册新账号：
@@ -133,12 +132,8 @@ echo '{ "steponeai_api_key": "sk_xxxxxxxxxxxxx" }' > ~/.clawd/secrets.json
 - 包含具体的时间、地点、人名等信息
 
 
----
-name: ai-calls-china-phone
-description: AI Call Robot for Outbound Calls to Chinese Phone Numbers — A professional AI calling capability designed exclusively for OpenClaw (Lobster) users. With just one prompt, it can make calls and get things done for you, supporting call transcript viewing and call status checking.
----
-
-- **github**：https://github.com/ustczz/openclaw-ai-calls-china-phone
+# AI Call Robot for Outbound Calls to Chinese Phone Numbers
+A professional AI calling capability designed exclusively for OpenClaw (Lobster) users. With just one prompt, it can make calls and get things done for you, supporting call transcript viewing and call status checking.
 
 ## 1. Account Registration
 
