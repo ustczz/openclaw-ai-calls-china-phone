@@ -1,6 +1,16 @@
 # 专门为openclaw(龙虾)设计开发的可以拨打中国的电话号码的机器人外呼(ai call)
 可以拨打中国电话号码的机器人外呼, 专为openclaw(龙虾)用户打造的专业ai呼叫能力,只要一个prompt就可以帮你打电话干活了，支持查看电话对话记录，查看电话状态等。
 
+## 联系方式
+
+如有问题欢迎沟通，扫描下方微信二维码添加好友。
+
+If you have any questions, feel free to reach out on WeChat by scanning the QR code below.
+
+<p align="center">
+  <img src="assets/wechat-qr.png" alt="WeChat QR Code" width="320" />
+</p>
+
 # Stepone AI 电话外呼
 
 ## 1. 注册账号
@@ -262,15 +272,3 @@ echo '{ "steponeai_api_key": "sk_xxxxxxxxxxxxx" }' > ~/.clawd/secrets.json
 ### user_requirement Suggestions
 - Clear and specific descriptions
 - Include specific time, location, person names, and other information
-
----
-
-## Contact
-
-如有问题欢迎沟通，扫描下方微信二维码添加好友。
-
-If you have any questions, feel free to reach out on WeChat by scanning the QR code below.
-
-<p align="center">
-  <img src="assets/wechat-qr.png" alt="WeChat QR Code" width="320" />
-</p>
