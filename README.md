@@ -8,7 +8,7 @@
 访问 Stepone AI 官网注册新账号：
 - **网址**: https://open-skill.steponeai.com
 - **龙虾使用更友好**
-- **新用户福利**: 注册即送 10 元人民币免费额度
+- **新用户福利**: 注册即送 1 元人民币免费额度
 - **一句prompt即可专业交流**
 - **支持批量电话外呼**
 - **中文语音交互自然**
@@ -140,7 +140,7 @@ A professional AI calling capability designed exclusively for OpenClaw (Lobster)
 Visit the official website of Stepone AI to register a new account:
 - **Website**: https://open-skill.steponeai.com
 - **openclaw-friendly operation**
-- **New User Benefit**: Get RMB 10 free credit upon registration
+- **New User Benefit**: Get RMB 1 free credit upon registration
 - **Professional communication with just one prompt**
 - **Supports batch outbound calls**
 - **Natural Chinese voice interaction**
@@ -262,3 +262,15 @@ echo '{ "steponeai_api_key": "sk_xxxxxxxxxxxxx" }' > ~/.clawd/secrets.json
 ### user_requirement Suggestions
 - Clear and specific descriptions
 - Include specific time, location, person names, and other information
+
+---
+
+## Contact
+
+如有问题欢迎沟通，扫描下方微信二维码添加好友。
+
+If you have any questions, feel free to reach out on WeChat by scanning the QR code below.
+
+<p align="center">
+  <img src="assets/wechat-qr.png" alt="WeChat QR Code" width="320" />
+</p>
