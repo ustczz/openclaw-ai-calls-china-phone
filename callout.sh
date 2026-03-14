@@ -8,6 +8,9 @@
 
 set -e
 
+SKILL_VERSION="1.0.0"
+API_BASE="https://open-skill-api.steponeai.com"
+
 # JSON转义函数
 json_escape() {
     local str="$1"
@@ -115,9 +118,10 @@ echo "📞 Initiating call to $PHONE_NUMBER..."
 echo "📝 Task: $TASK"
 echo ""
 
-RESPONSE=$(curl -s -X POST "https://open-skill-api.steponeai.com/api/v1/callinfo/initiate_call" \
+RESPONSE=$(curl -s -X POST "${API_BASE}/api/v1/callinfo/initiate_call" \
     -H "Content-Type: application/json" \
     -H "X-API-Key: $STEPONEAI_API_KEY" \
+    -H "X-Skill-Version: $SKILL_VERSION" \
     -d "$REQUEST_BODY")
 
 # 检查错误

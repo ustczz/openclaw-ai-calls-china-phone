@@ -4,6 +4,9 @@
 
 set -e
 
+SKILL_VERSION="1.0.0"
+API_BASE="https://open-skill-api.steponeai.com"
+
 # JSON转义函数
 json_escape() {
     local str="$1"
@@ -84,9 +87,10 @@ fi
 SAFE_CALL_ID=$(json_escape "$CALL_ID")
 
 # 获取通话详情
-RESPONSE=$(curl -s -X POST "https://open-skill-api.steponeai.com/api/v1/callinfo/search_callinfo" \
+RESPONSE=$(curl -s -X POST "${API_BASE}/api/v1/callinfo/search_callinfo" \
     -H "Content-Type: application/json" \
     -H "X-API-Key: $STEPONEAI_API_KEY" \
+    -H "X-Skill-Version: $SKILL_VERSION" \
     -d "{\"call_id\": \"$SAFE_CALL_ID\"}")
 
 if [[ "$JSON_OUTPUT" == "true" ]]; then
