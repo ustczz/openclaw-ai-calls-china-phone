@@ -15,6 +15,16 @@ on:
 permissions:
   contents: read
 
+env:
+  CLAWHUB_CLI_VERSION: 0.23.3
+  SKILL_PATH: skill
+  SKILL_SLUG: ai-calls-china-phone
+  SKILL_NAME: ClawCall China · 中国 AI 电话
+  SKILL_VERSION: 1.0.14
+  SKILL_CHANGELOG: 新增自然语言触发词、+86 号码支持、逐次确认、幂等键、提示注入防护、自检与渠道归因。
+  SKILL_CATEGORIES: communication,automation
+  SKILL_TOPICS: 帮我打电话,国内电话,中国手机号,AI外呼,AI呼入
+
 jobs:
   gate:
     runs-on: ubuntu-latest
@@ -30,31 +40,53 @@ jobs:
   preview:
     needs: gate
     if: github.event_name == 'pull_request'
-    permissions:
-      contents: read
-      id-token: write
-    uses: openclaw/clawhub/.github/workflows/skill-publish.yml@aec51d9d7a2ddeb9e62fd6edcaf67f8208645814
-    with:
-      owner: ustczz
-      skill_path: skill
-      dry_run: true
-      changelog: 新增自然语言触发词、+86 号码支持、逐次确认、幂等键、提示注入防护、自检与渠道归因。
-      categories: communication,automation
-      topics: 帮我打电话,国内电话,中国手机号,AI外呼,AI呼入
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preview the exact ClawHub update
+        env:
+          SOURCE_COMMIT: ${{ github.event.pull_request.head.sha }}
+          SOURCE_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          npx -y "clawhub@$CLAWHUB_CLI_VERSION" skill publish "$GITHUB_WORKSPACE/$SKILL_PATH" \
+            --slug "$SKILL_SLUG" \
+            --name "$SKILL_NAME" \
+            --owner ustczz \
+            --version "$SKILL_VERSION" \
+            --changelog "$SKILL_CHANGELOG" \
+            --categories "$SKILL_CATEGORIES" \
+            --topics "$SKILL_TOPICS" \
+            --source-repo "$GITHUB_REPOSITORY" \
+            --source-commit "$SOURCE_COMMIT" \
+            --source-ref "$SOURCE_REF" \
+            --source-path "$SKILL_PATH" \
+            --dry-run \
+            --json
 
   publish:
     needs: gate
     if: github.event_name == 'workflow_dispatch' && inputs.publish
-    permissions:
-      contents: read
-      id-token: write
-    uses: openclaw/clawhub/.github/workflows/skill-publish.yml@aec51d9d7a2ddeb9e62fd6edcaf67f8208645814
-    with:
-      owner: ustczz
-      skill_path: skill
-      dry_run: false
-      changelog: 新增自然语言触发词、+86 号码支持、逐次确认、幂等键、提示注入防护、自检与渠道归因。
-      categories: communication,automation
-      topics: 帮我打电话,国内电话,中国手机号,AI外呼,AI呼入
-    secrets:
-      clawhub_token: ${{ secrets.CLAWHUB_TOKEN }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Authenticate with ClawHub
+        env:
+          CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
+        run: |
+          test -n "$CLAWHUB_TOKEN"
+          npx -y "clawhub@$CLAWHUB_CLI_VERSION" login --token "$CLAWHUB_TOKEN"
+      - name: Publish the exact validated update
+        run: |
+          npx -y "clawhub@$CLAWHUB_CLI_VERSION" skill publish "$GITHUB_WORKSPACE/$SKILL_PATH" \
+            --slug "$SKILL_SLUG" \
+            --name "$SKILL_NAME" \
+            --owner ustczz \
+            --version "$SKILL_VERSION" \
+            --changelog "$SKILL_CHANGELOG" \
+            --categories "$SKILL_CATEGORIES" \
+            --topics "$SKILL_TOPICS" \
+            --source-repo "$GITHUB_REPOSITORY" \
+            --source-commit "$GITHUB_SHA" \
+            --source-ref "$GITHUB_REF_NAME" \
+            --source-path "$SKILL_PATH" \
+            --json
