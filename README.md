@@ -25,11 +25,24 @@
 
 ## 快速开始
 
+安装到当前 OpenClaw 工作区：
+
+```bash
+openclaw skills verify @ustczz/ai-calls-china-phone
+openclaw skills install @ustczz/ai-calls-china-phone
+```
+
+安装后对 OpenClaw 说“帮我配置国内 AI 电话”。注册并创建 API Key 后，通过 OpenClaw 的
+Skill 设置或环境变量配置 `STEPONEAI_API_KEY`。第一次拨号前先做只读自检。
+
+从源码运行：
+
 ```bash
 ./stepone.sh setup
 
 export STEPONEAI_API_KEY="YOUR_STEPONEAI_API_KEY"
 export STEPONEAI_CLIENT_PLATFORM="github"
+export STEPONEAI_CAMPAIGN="github-readme-v1014"
 
 ./stepone.sh doctor
 
