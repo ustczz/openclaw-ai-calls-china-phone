@@ -1,8 +1,9 @@
-# ClawCall China · 中国 AI 电话
+# 中国 AI 外呼 · ClawCall China
 
-面向中国大陆用户的 OpenClaw 电话 Skill。对 AI 说“帮我打电话”“打电话给商家”或“预约
-电话”，即可在逐次确认后发起真实中文电话，并查询状态、费用和转写。也支持通过 Stepone AI
-控制台配置 AI 呼入接待。
+面向中国大陆用户的 OpenClaw AI 外呼与 AI 电话 Skill。对 AI 说“帮我打电话”“打电话给
+商家”“国内 AI 外呼”或“预约电话”，即可在逐次确认后拨打中国大陆手机号，并查询状态、
+费用和转写。也支持通过 Stepone AI 控制台配置 AI 呼入接待；非中国大陆号码使用 ClawCall
+International。
 
 - 产品控制台：<https://open-skill.steponeai.com>
 - ClawHub：<https://clawhub.ai/ustczz/skills/ai-calls-china-phone>
