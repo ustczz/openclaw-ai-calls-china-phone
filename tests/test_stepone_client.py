@@ -6,13 +6,10 @@ import importlib.util
 import io
 import json
 import os
-from pathlib import Path
-import socket
 import types
 import unittest
+from pathlib import Path
 from unittest import mock
-import urllib.error
-
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -81,9 +78,8 @@ class ApiConfigurationTests(unittest.TestCase):
     def test_custom_api_base_requires_explicit_opt_in(self):
         with mock.patch.dict(
             os.environ, {"STEPONEAI_API_BASE": "https://attacker.example"}, clear=True
-        ):
-            with self.assertRaisesRegex(CLIENT.ClientError, "custom .* blocked"):
-                CLIENT.api_base()
+        ), self.assertRaisesRegex(CLIENT.ClientError, "custom .* blocked"):
+            CLIENT.api_base()
 
     def test_remote_plain_http_is_always_rejected(self):
         env = {
@@ -91,9 +87,10 @@ class ApiConfigurationTests(unittest.TestCase):
             "STEPONEAI_ALLOW_CUSTOM_API_BASE": "1",
             "STEPONEAI_ALLOW_INSECURE_HTTP": "1",
         }
-        with mock.patch.dict(os.environ, env, clear=True):
-            with self.assertRaisesRegex(CLIENT.ClientError, "must use HTTPS"):
-                CLIENT.api_base()
+        with mock.patch.dict(os.environ, env, clear=True), self.assertRaisesRegex(
+            CLIENT.ClientError, "must use HTTPS"
+        ):
+            CLIENT.api_base()
 
     def test_loopback_http_requires_both_explicit_flags(self):
         env = {
@@ -153,9 +150,10 @@ class SafetyTests(unittest.TestCase):
 
     def test_real_call_requires_confirmation_before_network(self):
         args = types.SimpleNamespace(confirm=False)
-        with mock.patch.object(CLIENT, "request") as request:
-            with self.assertRaisesRegex(CLIENT.ClientError, "--confirm"):
-                CLIENT.command_call(args)
+        with mock.patch.object(CLIENT, "request") as request, self.assertRaisesRegex(
+            CLIENT.ClientError, "--confirm"
+        ):
+            CLIENT.command_call(args)
         request.assert_not_called()
 
     def test_confirmed_call_adds_safety_rules_and_idempotency(self):
@@ -208,9 +206,8 @@ class SafetyTests(unittest.TestCase):
         )
         with mock.patch.object(
             CLIENT, "request", side_effect=CLIENT.RequestTransportError("timed out")
-        ):
-            with self.assertRaisesRegex(CLIENT.ClientError, "outcome is unknown") as raised:
-                CLIENT.command_call(args)
+        ), self.assertRaisesRegex(CLIENT.ClientError, "outcome is unknown") as raised:
+            CLIENT.command_call(args)
         self.assertIn("network-test-1", str(raised.exception))
 
     def test_json_stream_output_is_sanitized(self):

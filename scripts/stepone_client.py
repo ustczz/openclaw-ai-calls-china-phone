@@ -7,15 +7,14 @@ import argparse
 import json
 import os
 import re
-import socket
 import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
-from typing import Any, Iterable, Sequence
-
+from collections.abc import Iterable, Sequence
+from typing import Any
 
 SKILL_VERSION = "1.0.14"
 API_PROTOCOL_VERSION = "1.0.0"
@@ -169,6 +168,14 @@ def request_headers(
     return headers
 
 
+def open_request(req: urllib.request.Request, timeout: float):
+    scheme = urllib.parse.urlsplit(req.full_url).scheme
+    if scheme not in {"https", "http"}:
+        raise ClientError("request URL must use HTTP or HTTPS")
+    # The URL scheme is allowlisted immediately above.
+    return urllib.request.urlopen(req, timeout=timeout)  # nosec B310
+
+
 def request(
     method: str,
     path: str,
@@ -184,7 +191,7 @@ def request(
         headers["Content-Type"] = "application/json; charset=utf-8"
     req = urllib.request.Request(api_base() + path, data=data, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(req, timeout=timeout_seconds()) as response:
+        with open_request(req, timeout_seconds()) as response:
             result = decode_json(response.read(), path)
     except urllib.error.HTTPError as exc:
         body = exc.read()
@@ -193,7 +200,7 @@ def request(
         except ClientError:
             detail = "response body omitted because it was not valid JSON"
         raise ClientError(f"HTTP {exc.code} from {path}: {detail}") from exc
-    except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:
+    except (urllib.error.URLError, TimeoutError) as exc:
         raise RequestTransportError(f"Request to {path} failed: {exc}") from exc
     if isinstance(result, dict) and result.get("success") is False:
         raise ClientError(
@@ -212,7 +219,7 @@ def validate_call_id(value: str) -> str:
 
 
 def validate_phone(value: str) -> str:
-    normalized = value[3:] if value.startswith("+86") else value
+    normalized = value.removeprefix("+86")
     if not CHINA_MOBILE_RE.fullmatch(normalized):
         raise argparse.ArgumentTypeError(
             "phone must be one China mobile number in 11-digit or +86 format; "
@@ -374,7 +381,7 @@ def command_stream(args: argparse.Namespace) -> None:
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=args.stream_timeout) as response:
+        with open_request(req, args.stream_timeout) as response:
             for line in iter_sse_lines(response):
                 if not line or line.startswith(":"):
                     continue
@@ -416,7 +423,7 @@ def command_stream(args: argparse.Namespace) -> None:
                 print(f"[{label}] {content}", flush=True)
     except urllib.error.HTTPError as exc:
         raise ClientError(f"stream HTTP {exc.code}; response body omitted") from exc
-    except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:
+    except (urllib.error.URLError, TimeoutError) as exc:
         raise ClientError(f"stream failed: {exc}") from exc
 
 
