@@ -1,0 +1,92 @@
+name: ClawHub
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the validated skill to ClawHub
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  CLAWHUB_CLI_VERSION: 0.23.3
+  SKILL_PATH: skill
+  SKILL_SLUG: ai-calls-china-phone
+  SKILL_NAME: 中国 AI 外呼 · ClawCall China
+  SKILL_VERSION: 1.0.14
+  SKILL_CHANGELOG: 明确国内外号码路由；新增中文 AI 外呼触发词、+86 支持、逐次确认、提示注入防护、自检与渠道归因。
+  SKILL_CATEGORIES: communication,automation
+  SKILL_TOPICS: 帮我打电话,AI外呼,国内AI外呼,中国手机号,中国电话,AI呼入
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python3 -m unittest discover -s tests -v
+      - run: python3 -m compileall -q scripts skill/scripts tests
+      - run: find . -maxdepth 2 -name '*.sh' -print0 | xargs -0 -n1 sh -n
+
+  preview:
+    needs: gate
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preview the exact ClawHub update
+        env:
+          SOURCE_COMMIT: ${{ github.event.pull_request.head.sha }}
+          SOURCE_REF: ${{ github.event.pull_request.head.ref }}
+        run: |
+          npx -y "clawhub@$CLAWHUB_CLI_VERSION" skill publish "$GITHUB_WORKSPACE/$SKILL_PATH" \
+            --slug "$SKILL_SLUG" \
+            --name "$SKILL_NAME" \
+            --owner ustczz \
+            --version "$SKILL_VERSION" \
+            --changelog "$SKILL_CHANGELOG" \
+            --categories "$SKILL_CATEGORIES" \
+            --topics "$SKILL_TOPICS" \
+            --source-repo "$GITHUB_REPOSITORY" \
+            --source-commit "$SOURCE_COMMIT" \
+            --source-ref "$SOURCE_REF" \
+            --source-path "$SKILL_PATH" \
+            --dry-run \
+            --json
+
+  publish:
+    needs: gate
+    if: github.event_name == 'workflow_dispatch' && inputs.publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Authenticate with ClawHub
+        env:
+          CLAWHUB_TOKEN: ${{ secrets.CLAWHUB_TOKEN }}
+        run: |
+          test -n "$CLAWHUB_TOKEN"
+          npx -y "clawhub@$CLAWHUB_CLI_VERSION" login --token "$CLAWHUB_TOKEN"
+      - name: Publish the exact validated update
+        run: |
+          npx -y "clawhub@$CLAWHUB_CLI_VERSION" skill publish "$GITHUB_WORKSPACE/$SKILL_PATH" \
+            --slug "$SKILL_SLUG" \
+            --name "$SKILL_NAME" \
+            --owner ustczz \
+            --version "$SKILL_VERSION" \
+            --changelog "$SKILL_CHANGELOG" \
+            --categories "$SKILL_CATEGORIES" \
+            --topics "$SKILL_TOPICS" \
+            --source-repo "$GITHUB_REPOSITORY" \
+            --source-commit "$GITHUB_SHA" \
+            --source-ref "$GITHUB_REF_NAME" \
+            --source-path "$SKILL_PATH" \
+            --json
