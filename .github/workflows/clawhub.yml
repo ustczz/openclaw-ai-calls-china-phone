@@ -30,7 +30,10 @@ jobs:
   preview:
     needs: gate
     if: github.event_name == 'pull_request'
-    uses: openclaw/clawhub/.github/workflows/skill-publish.yml@v1
+    permissions:
+      contents: read
+      id-token: write
+    uses: openclaw/clawhub/.github/workflows/skill-publish.yml@aec51d9d7a2ddeb9e62fd6edcaf67f8208645814
     with:
       owner: ustczz
       skill_path: skill
@@ -42,7 +45,10 @@ jobs:
   publish:
     needs: gate
     if: github.event_name == 'workflow_dispatch' && inputs.publish
-    uses: openclaw/clawhub/.github/workflows/skill-publish.yml@v1
+    permissions:
+      contents: read
+      id-token: write
+    uses: openclaw/clawhub/.github/workflows/skill-publish.yml@aec51d9d7a2ddeb9e62fd6edcaf67f8208645814
     with:
       owner: ustczz
       skill_path: skill
