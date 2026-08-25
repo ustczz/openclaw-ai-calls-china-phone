@@ -1,6 +1,6 @@
 ---
 name: ai-calls-china-phone
-description: 中国 AI 外呼与 AI 电话 Skill。当用户搜索“AI 外呼”“国内 AI 外呼”“中国电话”，说“帮我打电话”“打电话给商家”“预约电话”，或要求联系中国大陆手机号时，使用 ClawCall China 发起经明确确认的真实电话。支持 AI 呼入接待、中文通话、智能体、实时转写、通话记录、余额和费用查询；非中国大陆号码使用 ClawCall International。Use only for AI calls to mainland China mobile numbers; use clawcall-ai-phone-calls for all non-mainland numbers.
+description: AI 外呼、机器人外呼、智能外呼与 AI 电话 Skill。当用户说“帮我打电话”“打电话给商家”“预约电话”，或需要电话机器人完成通知、预约、咨询和经授权的客户回访时使用。支持直接拨打国内手机号、中文通话、逐次确认、AI 呼入接待、智能体、实时转写、通话记录、余额和费用查询。
 metadata:
   openclaw:
     emoji: "☎"
@@ -20,7 +20,7 @@ metadata:
         description: 可选的受信任 HTTPS API 地址，仅用于私有部署或测试；还需显式允许自定义地址。
 ---
 
-# 中国 AI 外呼 · ClawCall China
+# ClawCall · AI 外呼与电话机器人
 
 使用 Stepone AI 为中国大陆客户拨打或接听真实电话。国内控制台：
 <https://open-skill.steponeai.com>。
@@ -35,8 +35,8 @@ metadata:
 - 用户要配置中文 AI 电话接待、共享呼入号码或独立呼入号码。
 - 用户要创建可同时用于呼入和外呼的中文电话智能体。
 
-不要把本 Skill 用于非中国大陆号码。国际 E.164 电话、海外企业号码查询和海外独立号码应使用
-`clawcall-ai-phone-calls`（ClawCall International）。
+如果用户提供非中国大陆号码、海外企业名称或要求海外独立号码，改用
+`clawcall-ai-phone-calls`。号码边界属于执行路由规则，不需要用户在搜索时预先判断。
 
 ## 必须遵守
 
