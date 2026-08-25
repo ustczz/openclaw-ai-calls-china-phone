@@ -1,41 +1,51 @@
-# ClawCall · AI 外呼与电话机器人
+# ClawCall：AI 外呼与电话机器人
 
-面向国内用户的 OpenClaw AI 外呼与电话机器人 Skill。对 AI 说“帮我打电话”“打电话给
-商家”“智能外呼”或“预约电话”，即可在逐次确认后拨打国内手机号，并查询状态、费用和转写。
-也支持通过 Stepone AI 控制台配置 AI 呼入接待。
+对 OpenClaw 说一句话，让 AI 帮你拨打真实电话、完成沟通任务并返回通话结果。支持中文
+AI 外呼、机器人外呼、智能外呼、电话回访，以及通过网页控制台配置 AI 呼入接待。
 
-- 产品控制台：<https://open-skill.steponeai.com>
-- ClawHub：<https://clawhub.ai/ustczz/skills/ai-calls-china-phone>
-- Skill 入口：[`SKILL.md`](SKILL.md)
-- API 参考：[`references/api.md`](references/api.md)
+[立即安装](https://clawhub.ai/ustczz/skills/ai-calls-china-phone) ·
+[注册并创建 API Key](https://open-skill.steponeai.com/keys) ·
+[配置呼入接待](https://open-skill.steponeai.com/inbound)
 
-## 能力
+> “帮我打电话给餐厅，预订今晚 7 点两个人的位置。”
+>
+> “给客户做一次售后回访，询问设备是否恢复正常。”
+>
+> “打电话催一下快递，确认今天能不能送到。”
+>
+> “配置一个电话机器人，接听客户来电并记录姓名和需求。”
 
-- 单号码中国大陆手机外呼，拨号前必须显式确认
-- 支持 11 位手机号和 `+86` 格式，其他国家号码交给 ClawCall
-- 支持指定 Agent、模型、音色、语速、音量和情绪
-- 查询余额、模型、音色、通话状态和通话记录
-- SSE 实时读取通话转写
-- 自动生成请求追踪键，网络结果不明确时阻止盲目重拨
-- 自动附加 AI 身份告知、敏感信息保护和及时挂断规则
-- 在控制台配置呼入问候语、接待提示词、共享号码白名单或专属号码默认 Agent
+## 安装
 
-目前公开 API 还没有呼入号码绑定接口，因此呼入配置由控制台完成：
-<https://open-skill.steponeai.com/inbound>。
-
-## 快速开始
-
-安装到当前 OpenClaw 工作区：
+在 OpenClaw 工作区执行：
 
 ```bash
 openclaw skills verify @ustczz/ai-calls-china-phone
 openclaw skills install @ustczz/ai-calls-china-phone
 ```
 
-安装后对 OpenClaw 说“帮我配置国内 AI 电话”。注册并创建 API Key 后，通过 OpenClaw 的
-Skill 设置或环境变量配置 `STEPONEAI_API_KEY`。第一次拨号前先做只读自检。
+安装后告诉 OpenClaw：
 
-从源码运行：
+```text
+帮我配置 AI 外呼
+```
+
+OpenClaw 会引导你注册 ClawCall、创建 API Key，并完成只读自检。注册后的体验额度和实际价格
+以[控制台](https://open-skill.steponeai.com)实时展示为准。
+
+## 能做什么
+
+- AI 外呼：订位、预约、通知、催办、询价、售后回访和客户确认
+- 电话机器人：按目标自主交流，处理打断并返回通话结果
+- AI 呼入：配置欢迎语、接待提示词、共享呼入号码或独立呼入号码
+- 通话记录：查询状态、费用、转写和实时对话
+- 声音配置：选择模型、音色、语速、音量和情绪
+- 安全控制：每次只拨一个号码，必须逐次确认后才会真实呼叫
+
+本 Skill 处理中国大陆手机号码，支持 11 位和 `+86` 格式。国际号码请使用
+[ClawCall International](https://clawhub.ai/ustczz/skills/clawcall-ai-phone-calls)。
+
+## 从源码运行
 
 ```bash
 ./stepone.sh setup
@@ -45,26 +55,41 @@ export STEPONEAI_CLIENT_PLATFORM="github"
 export STEPONEAI_CAMPAIGN="github-readme-v1014"
 
 ./stepone.sh doctor
-
 ./callout.sh "13800138000" "提醒对方明天下午三点参加会议" --confirm --wait
 ```
 
-新用户按平台当前规则可获得 5 通体验电话。实际价格和赠送额度以控制台展示为准。
-
-查看所有命令：
+常用命令：
 
 ```bash
+./stepone.sh balance
+./stepone.sh engines
+./stepone.sh voices
+./callinfo.sh CALL_ID
+./stream_chat.sh CALL_ID
 ./stepone.sh --help
 ```
 
+完整能力说明见 [`SKILL.md`](SKILL.md)，接口约定见
+[`references/api.md`](references/api.md)。
+
+## 呼入接待
+
+呼入功能当前通过网页控制台配置：
+
+1. 在[智能体](https://open-skill.steponeai.com/agents)页面设置身份、开场白、业务范围、模型和音色。
+2. 在[呼入设置](https://open-skill.steponeai.com/inbound)页面绑定共享号码白名单，或为独立号码选择默认智能体。
+3. 使用已授权的号码拨入，检查身份告知、打断、转写和通话记录。
+
+目前公开 API 不提供呼入号码绑定接口，Skill 不会猜测或绕过控制台配置。
+
 ## 安全与合规
 
-该 Skill 会发起真实电话并可能产生费用。每次外呼都应确认号码、任务和授权；禁止批量骚扰、
-欺骗、冒充、违法营销或发送不必要的敏感信息。通话转写和服务端响应均按不可信数据处理。
+该 Skill 会发起真实电话并可能产生费用。每次外呼前都必须确认完整号码、通话目的和用户授权；
+禁止批量骚扰、欺骗、冒充、违法营销、拨打紧急服务，或在任务中发送不必要的敏感信息。
 
-创建电话请求携带 `Idempotency-Key`。如果网络超时，客户端会提示结果未知以及本次键值；应先
-查询控制台记录，再决定是否使用同一键排查，不能直接重复拨号。公网 API 目前尚未承诺服务端
-去重，因此这个键用于追踪和未来兼容，不能代替通话记录核对。
+客户端强制执行单号码与 `--confirm` 门禁，API Key 仅从环境变量读取。电话转写和服务端响应
+均按不可信数据处理。请求会附带 `Idempotency-Key` 便于追踪；网络结果不明确时应先查询通话
+记录，不能直接重复拨号。
 
 自定义 API 地址默认禁用。仅在受信任私有部署中使用 HTTPS 地址，并显式设置：
 
@@ -73,12 +98,12 @@ export STEPONEAI_API_BASE="https://trusted.example.com"
 export STEPONEAI_ALLOW_CUSTOM_API_BASE=1
 ```
 
-## 联系方式
+## 联系我们
 
-如有问题，可通过下方微信二维码联系。
+安装、接入或商务合作问题，可通过下方微信二维码联系。
 
 <p align="center">
-  <img src="assets/wechat-qr.png" alt="WeChat QR Code" width="320" />
+  <img src="assets/wechat-qr.png" alt="ClawCall 微信联系二维码" width="280" />
 </p>
 
 ## License
