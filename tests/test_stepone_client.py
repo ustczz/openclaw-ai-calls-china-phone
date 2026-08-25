@@ -101,6 +101,13 @@ class ApiConfigurationTests(unittest.TestCase):
         with mock.patch.dict(os.environ, env, clear=True):
             self.assertEqual(CLIENT.api_base(), "http://127.0.0.1:8000")
 
+    def test_api_key_rejects_non_ascii_and_header_breaks(self):
+        for value in ("复制 Key 后再试", "valid-looking-key\nInjected: value"):
+            with self.subTest(value=value), mock.patch.dict(
+                os.environ, {"STEPONEAI_API_KEY": value}, clear=True
+            ), self.assertRaisesRegex(CLIENT.ClientError, "invalid format"):
+                CLIENT.api_key()
+
 
 class ValidationTests(unittest.TestCase):
     def test_phone_accepts_local_and_plus_86(self):

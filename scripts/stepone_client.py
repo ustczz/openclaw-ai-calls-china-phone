@@ -24,6 +24,7 @@ CALL_ID_RE = re.compile(r"^[A-Za-z0-9_.:^~-]{1,256}$")
 CHINA_MOBILE_RE = re.compile(r"^1[3-9][0-9]{9}$")
 IDEMPOTENCY_KEY_RE = re.compile(r"^[A-Za-z0-9._:-]{8,128}$")
 ATTRIBUTION_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+API_KEY_RE = re.compile(r"^[A-Za-z0-9._-]{8,256}$")
 TERMINAL_STATUSES = {
     "completed",
     "complete",
@@ -103,6 +104,10 @@ def api_key() -> str:
     value = os.environ.get("STEPONEAI_API_KEY", "").strip()
     if not value:
         raise ClientError("STEPONEAI_API_KEY is not set")
+    if not API_KEY_RE.fullmatch(value):
+        raise ClientError(
+            "STEPONEAI_API_KEY has an invalid format; copy the API Key again without spaces or line breaks"
+        )
     return value
 
 
