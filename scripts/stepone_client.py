@@ -11,29 +11,82 @@ import socket
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
-from typing import Any, Iterable
+import uuid
+from typing import Any, Iterable, Sequence
 
 
-SKILL_VERSION = "2.0.0"
+SKILL_VERSION = "1.0.14"
 API_PROTOCOL_VERSION = "1.0.0"
 DEFAULT_API_BASE = "https://open-skill-api.steponeai.com"
 DEFAULT_TIMEOUT = 30.0
-CALL_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
+CALL_ID_RE = re.compile(r"^[A-Za-z0-9_.:^~-]{1,256}$")
 CHINA_MOBILE_RE = re.compile(r"^1[3-9][0-9]{9}$")
-TERMINAL_STATUSES = {"completed", "complete", "ended", "failed", "cancelled", "canceled"}
-INSTRUCTION_FIELDS = {"LLM_SYSTEM_INSTRUCTION"}
+IDEMPOTENCY_KEY_RE = re.compile(r"^[A-Za-z0-9._:-]{8,128}$")
+ATTRIBUTION_RE = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+TERMINAL_STATUSES = {
+    "completed",
+    "complete",
+    "ended",
+    "hung_up",
+    "hangup",
+    "failed",
+    "cancelled",
+    "canceled",
+    "no_answer",
+    "busy",
+    "declined",
+    "rejected",
+    "timeout",
+    "voicemail",
+}
+LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
+CALL_SAFETY_RULES = """必须遵守以下电话安全规则：
+1. 开场明确说明自己是 AI 助手，并说明受谁委托及本次来电目的。
+2. 不索取密码、验证码、支付卡号或与任务无关的敏感信息。
+3. 对方要求停止、拒绝继续或要求挂断时，立即礼貌结束并挂断。
+4. 任务目标已完成或确认无法完成时，简短总结后立即挂断，不继续闲聊。
+
+本次任务："""
 
 
 class ClientError(RuntimeError):
     pass
 
 
+class RequestTransportError(ClientError):
+    pass
+
+
+def env_enabled(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def api_base() -> str:
     value = os.environ.get("STEPONEAI_API_BASE", DEFAULT_API_BASE).strip().rstrip("/")
-    if not value.startswith(("https://", "http://")):
-        raise ClientError("STEPONEAI_API_BASE must use http:// or https://")
-    return value
+    parsed = urllib.parse.urlsplit(value)
+    if not parsed.scheme or not parsed.netloc or parsed.hostname is None:
+        raise ClientError("STEPONEAI_API_BASE must be an absolute HTTPS URL")
+    if parsed.username or parsed.password or parsed.query or parsed.fragment:
+        raise ClientError("STEPONEAI_API_BASE cannot include credentials, a query, or a fragment")
+    if parsed.path not in {"", "/"}:
+        raise ClientError("STEPONEAI_API_BASE cannot include a path")
+    if parsed.scheme != "https":
+        insecure_loopback = (
+            parsed.scheme == "http"
+            and parsed.hostname.lower() in LOOPBACK_HOSTS
+            and env_enabled("STEPONEAI_ALLOW_INSECURE_HTTP")
+        )
+        if not insecure_loopback:
+            raise ClientError("STEPONEAI_API_BASE must use HTTPS")
+    normalized = urllib.parse.urlunsplit((parsed.scheme, parsed.netloc, "", "", ""))
+    if normalized != DEFAULT_API_BASE and not env_enabled("STEPONEAI_ALLOW_CUSTOM_API_BASE"):
+        raise ClientError(
+            "custom STEPONEAI_API_BASE blocked; set STEPONEAI_ALLOW_CUSTOM_API_BASE=1 "
+            "only for a trusted private deployment"
+        )
+    return normalized
 
 
 def timeout_seconds() -> float:
@@ -54,12 +107,19 @@ def api_key() -> str:
     return value
 
 
+def is_instruction_field(key: str) -> bool:
+    normalized = re.sub(r"[^a-z0-9]", "", key.lower())
+    return "instruction" in normalized and any(
+        token in normalized for token in ("llm", "system", "assistant", "agent", "prompt")
+    )
+
+
 def strip_instruction_fields(value: Any) -> Any:
     if isinstance(value, dict):
         return {
             key: strip_instruction_fields(child)
             for key, child in value.items()
-            if key not in INSTRUCTION_FIELDS
+            if not is_instruction_field(str(key))
         }
     if isinstance(value, list):
         return [strip_instruction_fields(child) for child in value]
@@ -78,20 +138,46 @@ def render_json(value: Any) -> None:
     print(json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True))
 
 
+def attribution_value(env_name: str, default: str | None = None) -> str | None:
+    value = os.environ.get(env_name, default or "").strip()
+    if not value:
+        return None
+    if not ATTRIBUTION_RE.fullmatch(value):
+        raise ClientError(f"{env_name} may contain only letters, numbers, ., _, and -")
+    return value
+
+
+def request_headers(
+    *, authenticated: bool, extra_headers: dict[str, str] | None = None
+) -> dict[str, str]:
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": f"openclaw-ai-calls-china-phone/{SKILL_VERSION}",
+        "X-Skill-Version": API_PROTOCOL_VERSION,
+        "X-Client-Version": SKILL_VERSION,
+        "X-Client-Platform": (
+            attribution_value("STEPONEAI_CLIENT_PLATFORM", "clawhub") or "clawhub"
+        ),
+    }
+    campaign = attribution_value("STEPONEAI_CAMPAIGN")
+    if campaign:
+        headers["X-Campaign"] = campaign
+    if authenticated:
+        headers["X-API-Key"] = api_key()
+    if extra_headers:
+        headers.update(extra_headers)
+    return headers
+
+
 def request(
     method: str,
     path: str,
     payload: dict[str, Any] | None = None,
     *,
     authenticated: bool = True,
+    extra_headers: dict[str, str] | None = None,
 ) -> Any:
-    headers = {
-        "Accept": "application/json",
-        "User-Agent": f"openclaw-ai-calls-china-phone/{SKILL_VERSION}",
-        "X-Skill-Version": API_PROTOCOL_VERSION,
-    }
-    if authenticated:
-        headers["X-API-Key"] = api_key()
+    headers = request_headers(authenticated=authenticated, extra_headers=extra_headers)
     data = None
     if payload is not None:
         data = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
@@ -108,7 +194,7 @@ def request(
             detail = "response body omitted because it was not valid JSON"
         raise ClientError(f"HTTP {exc.code} from {path}: {detail}") from exc
     except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:
-        raise ClientError(f"Request to {path} failed: {exc}") from exc
+        raise RequestTransportError(f"Request to {path} failed: {exc}") from exc
     if isinstance(result, dict) and result.get("success") is False:
         raise ClientError(
             "API rejected the request: "
@@ -119,13 +205,27 @@ def request(
 
 def validate_call_id(value: str) -> str:
     if not CALL_ID_RE.fullmatch(value):
-        raise argparse.ArgumentTypeError("call_id may contain only letters, numbers, _ and -")
+        raise argparse.ArgumentTypeError(
+            "call_id may contain only letters, numbers, _, -, ., :, ^, and ~"
+        )
     return value
 
 
 def validate_phone(value: str) -> str:
-    if not CHINA_MOBILE_RE.fullmatch(value):
-        raise argparse.ArgumentTypeError("phone must be one 11-digit China mobile number")
+    normalized = value[3:] if value.startswith("+86") else value
+    if not CHINA_MOBILE_RE.fullmatch(normalized):
+        raise argparse.ArgumentTypeError(
+            "phone must be one China mobile number in 11-digit or +86 format; "
+            "use ClawCall for other countries"
+        )
+    return normalized
+
+
+def validate_idempotency_key(value: str) -> str:
+    if not IDEMPOTENCY_KEY_RE.fullmatch(value):
+        raise argparse.ArgumentTypeError(
+            "idempotency key must be 8-128 characters using letters, numbers, ., _, :, or -"
+        )
     return value
 
 
@@ -153,7 +253,7 @@ def bounded_text(value: str | None, field: str, maximum: int) -> str | None:
     return stripped
 
 
-def find_first(value: Any, keys: set[str]) -> Any:
+def find_first(value: Any, keys: Sequence[str]) -> Any:
     if isinstance(value, dict):
         for key in keys:
             if key in value and value[key] not in (None, "", []):
@@ -171,19 +271,36 @@ def find_first(value: Any, keys: set[str]) -> Any:
 
 
 def extract_call_id(result: Any) -> str | None:
-    call_ids = find_first(result, {"call_ids"})
+    call_ids = find_first(result, ("call_ids",))
     if isinstance(call_ids, list) and call_ids and isinstance(call_ids[0], str):
         return call_ids[0]
-    value = find_first(result, {"call_id", "provider_call_id"})
-    return value if isinstance(value, str) else None
+    for key in ("call_id", "provider_call_id"):
+        value = find_first(result, (key,))
+        if isinstance(value, str):
+            return value
+    return None
 
 
 def is_terminal(result: Any) -> bool:
-    duration = find_first(result, {"duration_seconds"})
-    if isinstance(duration, (int, float)):
+    status = find_first(result, ("status", "call_status", "state"))
+    if isinstance(status, str) and status.strip().lower() in TERMINAL_STATUSES:
         return True
-    status = find_first(result, {"status", "call_status"})
-    return isinstance(status, str) and status.lower() in TERMINAL_STATUSES
+    ended_at = find_first(result, ("ended_at", "end_time", "endedAt"))
+    return ended_at not in (None, "", 0, False)
+
+
+def build_call_requirement(task: str | None) -> str:
+    user_task = bounded_text(task, "task", 19500)
+    requirement = CALL_SAFETY_RULES + (user_task or "按照已配置智能体的任务执行。")
+    return bounded_text(requirement, "task with safety rules", 20000) or ""
+
+
+def result_with_idempotency(result: Any, key: str) -> Any:
+    if isinstance(result, dict):
+        output = dict(result)
+        output["client_idempotency_key"] = key
+        return output
+    return {"result": result, "client_idempotency_key": key}
 
 
 def command_call(args: argparse.Namespace) -> None:
@@ -191,15 +308,15 @@ def command_call(args: argparse.Namespace) -> None:
         raise ClientError(
             "real call blocked: obtain the user's explicit confirmation, then pass --confirm"
         )
-    task = bounded_text(args.task, "task", 20000)
-    if task is None and args.agent_id is None:
+    if args.task is None and args.agent_id is None:
         raise ClientError("provide a task or --agent-id")
     if args.agent_id is not None and args.agent_id <= 0:
         raise ClientError("agent_id must be a positive integer")
+    idempotency_key = args.idempotency_key or f"china-call-{uuid.uuid4()}"
     payload: dict[str, Any] = {"phones": args.phone}
     optionals = {
         "agent_id": args.agent_id,
-        "user_requirement": task,
+        "user_requirement": build_call_requirement(args.task),
         "model_engine": bounded_text(args.model_engine, "model_engine", 100),
         "voice_id": bounded_text(args.voice_id, "voice_id", 100),
         "volume": args.volume,
@@ -207,9 +324,20 @@ def command_call(args: argparse.Namespace) -> None:
         "emotion": bounded_text(args.emotion, "emotion", 100),
     }
     payload.update({key: value for key, value in optionals.items() if value is not None})
-    result = request("POST", "/api/v1/callinfo/initiate_call", payload)
+    try:
+        result = request(
+            "POST",
+            "/api/v1/callinfo/initiate_call",
+            payload,
+            extra_headers={"Idempotency-Key": idempotency_key},
+        )
+    except RequestTransportError as exc:
+        raise ClientError(
+            f"{exc}; call outcome is unknown. Check call records before retrying and reuse "
+            f"--idempotency-key {idempotency_key}"
+        ) from exc
     if not args.wait:
-        render_json(result)
+        render_json(result_with_idempotency(result, idempotency_key))
         return
     call_id = extract_call_id(result)
     if not call_id:
@@ -219,7 +347,7 @@ def command_call(args: argparse.Namespace) -> None:
         time.sleep(args.poll_interval)
         status = request("POST", "/api/v1/callinfo/search_callinfo", {"call_id": call_id})
         if is_terminal(status):
-            render_json(status)
+            render_json(result_with_idempotency(status, idempotency_key))
             return
     raise ClientError(f"timed out waiting for call {call_id}; query it with ./callinfo.sh {call_id}")
 
@@ -234,13 +362,10 @@ def iter_sse_lines(response: Any) -> Iterable[str]:
 
 
 def command_stream(args: argparse.Namespace) -> None:
-    headers = {
-        "Accept": "text/event-stream",
-        "Content-Type": "application/json; charset=utf-8",
-        "User-Agent": f"openclaw-ai-calls-china-phone/{SKILL_VERSION}",
-        "X-API-Key": api_key(),
-        "X-Skill-Version": API_PROTOCOL_VERSION,
-    }
+    headers = request_headers(authenticated=True)
+    headers.update(
+        {"Accept": "text/event-stream", "Content-Type": "application/json; charset=utf-8"}
+    )
     body = json.dumps({"call_id": args.call_id}, separators=(",", ":")).encode("utf-8")
     req = urllib.request.Request(
         api_base() + "/api/v1/callinfo/stream_chat_history",
@@ -253,16 +378,31 @@ def command_stream(args: argparse.Namespace) -> None:
             for line in iter_sse_lines(response):
                 if not line or line.startswith(":"):
                     continue
-                if args.json_output:
-                    print(line, flush=True)
-                    continue
                 if not line.startswith("data:"):
                     continue
                 raw_payload = line[5:].strip()
                 try:
                     event = strip_instruction_fields(json.loads(raw_payload))
                 except json.JSONDecodeError:
-                    print("[系统] 收到无法解析的流事件", flush=True)
+                    if args.json_output:
+                        print(
+                            'data: {"role":"system","content":"[UNPARSEABLE_EVENT]"}',
+                            flush=True,
+                        )
+                    else:
+                        print("[系统] 收到无法解析的流事件", flush=True)
+                    continue
+                if args.json_output:
+                    print(
+                        "data: "
+                        + json.dumps(
+                            event,
+                            ensure_ascii=False,
+                            separators=(",", ":"),
+                            sort_keys=True,
+                        ),
+                        flush=True,
+                    )
                     continue
                 role = str(event.get("role", "system")) if isinstance(event, dict) else "system"
                 content = str(event.get("content", "")) if isinstance(event, dict) else ""
@@ -296,6 +436,38 @@ def command_inbound(_: argparse.Namespace) -> None:
     )
 
 
+def command_setup(_: argparse.Namespace) -> None:
+    render_json(
+        {
+            "signup_url": "https://open-skill.steponeai.com",
+            "api_keys_url": "https://open-skill.steponeai.com/keys",
+            "free_trial": "New users receive five trial calls, subject to current platform terms.",
+            "next_step": "Create an API key, export STEPONEAI_API_KEY, then run ./stepone.sh doctor.",
+        }
+    )
+
+
+def command_doctor(_: argparse.Namespace) -> None:
+    report: dict[str, Any] = {
+        "client_version": SKILL_VERSION,
+        "api_protocol_version": API_PROTOCOL_VERSION,
+        "api_base": api_base(),
+        "client_platform": attribution_value("STEPONEAI_CLIENT_PLATFORM", "clawhub"),
+        "api_key_configured": bool(os.environ.get("STEPONEAI_API_KEY", "").strip()),
+    }
+    try:
+        report["service_version"] = request(
+            "GET", "/api/v1/callinfo/skill_version", authenticated=False
+        )
+        if report["api_key_configured"]:
+            report["balance"] = request("GET", "/api/v1/callinfo/balance")
+        report["ready"] = report["api_key_configured"]
+    except ClientError as exc:
+        report["ready"] = False
+        report["error"] = str(exc)
+    render_json(report)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Stepone AI China phone client")
     parser.add_argument("--client-version", action="version", version=SKILL_VERSION)
@@ -311,6 +483,7 @@ def build_parser() -> argparse.ArgumentParser:
     call.add_argument("--speed", type=integer_between(0, 100))
     call.add_argument("--emotion")
     call.add_argument("--confirm", action="store_true")
+    call.add_argument("--idempotency-key", type=validate_idempotency_key)
     call.add_argument("--wait", action="store_true")
     call.add_argument("--wait-timeout", type=int, default=600)
     call.add_argument("--poll-interval", type=int, default=5)
@@ -338,6 +511,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     inbound = subparsers.add_parser("inbound", help="show the current inbound setup flow")
     inbound.set_defaults(func=command_inbound)
+
+    setup = subparsers.add_parser("setup", help="show registration and API key setup links")
+    setup.set_defaults(func=command_setup)
+
+    doctor = subparsers.add_parser("doctor", help="check local configuration and service access")
+    doctor.set_defaults(func=command_doctor)
     return parser
 
 

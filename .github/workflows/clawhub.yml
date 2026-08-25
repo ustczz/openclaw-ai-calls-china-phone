@@ -1,0 +1,54 @@
+name: ClawHub
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish the validated skill to ClawHub
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python3 -m unittest discover -s tests -v
+      - run: python3 -m compileall -q scripts skill/scripts tests
+      - run: find . -maxdepth 2 -name '*.sh' -print0 | xargs -0 -n1 sh -n
+
+  preview:
+    needs: gate
+    if: github.event_name == 'pull_request'
+    uses: openclaw/clawhub/.github/workflows/skill-publish.yml@v1
+    with:
+      owner: ustczz
+      skill_path: skill
+      dry_run: true
+      changelog: 新增自然语言触发词、+86 号码支持、逐次确认、幂等键、提示注入防护、自检与渠道归因。
+      categories: communication,automation
+      topics: 帮我打电话,国内电话,中国手机号,AI外呼,AI呼入
+
+  publish:
+    needs: gate
+    if: github.event_name == 'workflow_dispatch' && inputs.publish
+    uses: openclaw/clawhub/.github/workflows/skill-publish.yml@v1
+    with:
+      owner: ustczz
+      skill_path: skill
+      dry_run: false
+      changelog: 新增自然语言触发词、+86 号码支持、逐次确认、幂等键、提示注入防护、自检与渠道归因。
+      categories: communication,automation
+      topics: 帮我打电话,国内电话,中国手机号,AI外呼,AI呼入
+    secrets:
+      clawhub_token: ${{ secrets.CLAWHUB_TOKEN }}

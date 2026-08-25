@@ -1,6 +1,6 @@
 ---
 name: ai-calls-china-phone
-description: 为中国大陆手机号码提供真实 AI 电话外呼和呼入接待能力，支持中文通话、智能体、实时转写、通话记录、模型与音色配置。Use for China phone calls, Chinese AI outbound calls, inbound receptionist setup, call status, and transcripts. 中国电话、国内电话、AI外呼、AI呼入。
+description: 当用户说“帮我打电话”“打电话给商家”“预约电话”“国内电话”或要求联系中国大陆手机号时，使用 ClawCall China 发起经明确确认的真实 AI 电话。支持中国 AI 外呼、AI 呼入接待、中文通话、智能体、实时转写、通话记录、余额和费用查询。Use for China phone calls and Chinese AI calling; use ClawCall for numbers outside mainland China.
 metadata:
   openclaw:
     emoji: "☎"
@@ -17,17 +17,20 @@ metadata:
         description: Stepone AI 国内电话 API Key。
       - name: STEPONEAI_API_BASE
         required: false
-        description: 可选的 API 地址覆盖，仅用于私有部署或测试。
+        description: 可选的受信任 HTTPS API 地址，仅用于私有部署或测试；还需显式允许自定义地址。
 ---
 
-# 中国 AI 电话（呼入与外呼）
+# ClawCall China · 中国 AI 电话
 
 使用 Stepone AI 为中国大陆客户拨打或接听真实电话。国内控制台：
 <https://open-skill.steponeai.com>。
 
+新用户按平台当前规则可获得 5 通体验电话。真实电话可能产生费用，并会把号码、任务和通话
+转写发送给 Stepone AI。不要把 API Key、密码、验证码或支付信息放入电话任务。
+
 ## 何时使用
 
-- 用户明确要求拨打中国大陆手机号码。
+- 用户说“帮我打电话”“打电话给商家”“预约电话”或明确要求拨打中国大陆手机号码。
 - 用户要查询一次国内 AI 电话的状态、转写或费用。
 - 用户要配置中文 AI 电话接待、共享呼入号码或独立呼入号码。
 - 用户要创建可同时用于呼入和外呼的中文电话智能体。
@@ -47,15 +50,23 @@ ClawCall Skill。
 
 ## 初次配置
 
-1. 注册并登录 <https://open-skill.steponeai.com>。
-2. 在 <https://open-skill.steponeai.com/keys> 创建 API Key。
-3. 仅通过环境变量配置：
+1. 运行 `./stepone.sh setup` 查看注册和 API Key 地址。
+2. 注册并登录 <https://open-skill.steponeai.com>。
+3. 在 <https://open-skill.steponeai.com/keys> 创建 API Key。
+4. 仅通过环境变量配置：
 
 ```bash
 export STEPONEAI_API_KEY="YOUR_STEPONEAI_API_KEY"
+export STEPONEAI_CLIENT_PLATFORM="clawhub"
 ```
 
 不要把 Key 写入 `SKILL.md`、脚本、聊天消息或 Git 仓库。
+
+配置后先运行只读自检：
+
+```bash
+./stepone.sh doctor
+```
 
 ## 发起国内外呼
 
@@ -64,6 +75,9 @@ export STEPONEAI_API_KEY="YOUR_STEPONEAI_API_KEY"
 ```bash
 ./callout.sh "13800138000" "提醒王先生明天下午三点参加线上会议；先确认身份，再说明事项" --confirm
 ```
+
+也接受 `+8613800138000`，发送到国内 API 前会规范化为 11 位号码。客户端会自动附加 AI
+身份告知、敏感信息保护和任务结束后及时挂断规则。
 
 使用已经在控制台创建的智能体：
 
@@ -80,11 +94,14 @@ export STEPONEAI_API_KEY="YOUR_STEPONEAI_API_KEY"
 --volume 0-100         音量
 --speed 0-100          语速
 --emotion NAME         音色情感
+--idempotency-key KEY  网络结果不明确时，复用同一键进行排查
 --wait                 等待通话结束，最长 10 分钟
 --confirm              用户已确认本次真实电话
 ```
 
 `user_requirement` 和 `agent_id` 至少提供一个。任务应说明身份、目标、必要背景、边界和成功条件。
+客户端不会自动重试创建电话。如果网络超时，先在控制台检查通话记录，不得直接再次拨号。
+公网 API 尚未承诺服务端按 `Idempotency-Key` 去重，因此不要仅凭该键假定重试不会重复拨号。
 
 ## 查询和监听
 
@@ -93,6 +110,7 @@ export STEPONEAI_API_KEY="YOUR_STEPONEAI_API_KEY"
 ./stream_chat.sh CALL_ID
 ./stream_chat.sh CALL_ID --json
 ./stepone.sh balance
+./stepone.sh doctor
 ./stepone.sh engines
 ./stepone.sh voices
 ./stepone.sh version
