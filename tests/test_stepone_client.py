@@ -71,7 +71,7 @@ class ApiConfigurationTests(unittest.TestCase):
         self.assertEqual(request.full_url, "https://domestic.example/status")
         self.assertEqual(headers["x-api-key"], "test-key")
         self.assertEqual(headers["x-skill-version"], "1.0.0")
-        self.assertEqual(headers["x-client-version"], "1.0.14")
+        self.assertEqual(headers["x-client-version"], "1.0.15")
         self.assertEqual(headers["x-client-platform"], "workbuddy")
         self.assertEqual(headers["x-campaign"], "launch-v2")
 

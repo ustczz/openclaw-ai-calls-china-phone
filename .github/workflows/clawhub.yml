@@ -19,9 +19,9 @@ env:
   CLAWHUB_CLI_VERSION: 0.23.3
   SKILL_PATH: skill
   SKILL_SLUG: ai-calls-china-phone
-  SKILL_NAME: ClawCall · AI 外呼与电话机器人
-  SKILL_VERSION: 1.0.14
-  SKILL_CHANGELOG: 新增 AI 外呼、机器人外呼与智能外呼触发词；支持 +86、逐次确认、提示注入防护、自检与渠道归因。
+  SKILL_NAME: ClawCall · AI 外呼、智能外呼与电话机器人
+  SKILL_VERSION: 1.0.15
+  SKILL_CHANGELOG: 优化“智能外呼”精确搜索匹配；功能、安全边界与逐次确认机制保持不变。
   SKILL_CATEGORIES: communication,automation
   SKILL_TOPICS: AI外呼,智能外呼,机器人外呼,AI电话,电话机器人
 

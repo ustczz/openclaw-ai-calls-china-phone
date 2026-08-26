@@ -16,7 +16,7 @@ import uuid
 from collections.abc import Iterable, Sequence
 from typing import Any
 
-SKILL_VERSION = "1.0.14"
+SKILL_VERSION = "1.0.15"
 API_PROTOCOL_VERSION = "1.0.0"
 DEFAULT_API_BASE = "https://open-skill-api.steponeai.com"
 DEFAULT_TIMEOUT = 30.0
