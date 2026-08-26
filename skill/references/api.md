@@ -6,10 +6,10 @@
 - API：`https://open-skill-api.steponeai.com`
 - Header：`X-API-Key: $STEPONEAI_API_KEY`
 - API 兼容协议：`X-Skill-Version: 1.0.0`
-- 客户端版本：`X-Client-Version: 1.0.14`
+- 客户端版本：`X-Client-Version: 1.0.15`
 - 渠道归因：`X-Client-Platform`，可选 `X-Campaign`
 
-Skill、ClawHub 包和 User-Agent 统一为 `1.0.14`。服务端兼容协议仍是独立的 `1.0.0`，通过
+Skill、ClawHub 包和 User-Agent 统一为 `1.0.15`。服务端兼容协议仍是独立的 `1.0.0`，通过
 `X-Skill-Version` 传递；`X-Client-Version` 用于诊断和渠道统计。
 
 ## 发起外呼

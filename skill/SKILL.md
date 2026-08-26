@@ -20,7 +20,7 @@ metadata:
         description: 可选的受信任 HTTPS API 地址，仅用于私有部署或测试；还需显式允许自定义地址。
 ---
 
-# ClawCall · AI 外呼与电话机器人
+# ClawCall · AI 外呼、智能外呼与电话机器人
 
 使用 Stepone AI 为中国大陆客户拨打或接听真实电话。国内控制台：
 <https://open-skill.steponeai.com>。
