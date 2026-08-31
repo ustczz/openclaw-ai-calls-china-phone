@@ -85,6 +85,21 @@ export STEPONEAI_CLIENT_PLATFORM="clawhub"
 ./callout.sh "13800138000" --agent-id 123 --confirm
 ```
 
+也可以直接列出或创建智能体。提示词从本地 UTF-8 文件读取，避免进入 shell 历史：
+
+```bash
+./stepone.sh agents
+./stepone.sh agent-create \
+  --name "会议提醒" \
+  --prompt-file ./agent-prompt.txt \
+  --greeting "您好，我是 AI 助手。" \
+  --model-engine stepone-mini \
+  --voice-id v0001
+```
+
+创建成功会返回智能体 `id`。调用时只需传 `--agent-id`。如果请求同时包含任务、模型、音色、
+语速、音量或情感，`agent_id` 优先，服务端采用该智能体保存的配置并忽略临时覆盖字段。
+
 可选参数：
 
 ```text
@@ -100,8 +115,8 @@ export STEPONEAI_CLIENT_PLATFORM="clawhub"
 ```
 
 `user_requirement` 和 `agent_id` 至少提供一个。任务应说明身份、目标、必要背景、边界和成功条件。
-客户端不会自动重试创建电话。如果网络超时，先在控制台检查通话记录，不得直接再次拨号。
-公网 API 尚未承诺服务端按 `Idempotency-Key` 去重，因此不要仅凭该键假定重试不会重复拨号。
+客户端不会自动重试创建电话。服务端按账号和 `Idempotency-Key` 对同一请求去重；如果网络超时，
+先在控制台检查通话记录，并复用原 Key 查询或排查，不得换新 Key 直接再次拨号。
 
 ## 查询和监听
 
@@ -113,6 +128,7 @@ export STEPONEAI_CLIENT_PLATFORM="clawhub"
 ./stepone.sh doctor
 ./stepone.sh engines
 ./stepone.sh voices
+./stepone.sh agents
 ./stepone.sh version
 ```
 
@@ -121,7 +137,7 @@ export STEPONEAI_CLIENT_PLATFORM="clawhub"
 
 ## 配置国内呼入
 
-国内呼入当前通过网页控制台配置，不要猜测或调用未公开的管理 API。
+国内呼入号码绑定仍通过网页控制台配置；智能体本身可以通过网页或公开 API 创建。
 
 1. 打开 <https://open-skill.steponeai.com/agents>，创建并启用智能体。
 2. 配置名称、说明、呼入开场白、角色提示词、模型、音色、语速、音量和是否允许打断。
