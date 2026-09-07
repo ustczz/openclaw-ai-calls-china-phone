@@ -16,7 +16,7 @@ import uuid
 from collections.abc import Iterable, Sequence
 from typing import Any
 
-SKILL_VERSION = "1.0.15"
+SKILL_VERSION = "1.0.16"
 API_PROTOCOL_VERSION = "1.0.0"
 DEFAULT_API_BASE = "https://open-skill-api.steponeai.com"
 DEFAULT_TIMEOUT = 30.0
@@ -188,6 +188,7 @@ def request(
     *,
     authenticated: bool = True,
     extra_headers: dict[str, str] | None = None,
+    expose_error_body: bool = True,
 ) -> Any:
     headers = request_headers(authenticated=authenticated, extra_headers=extra_headers)
     data = None
@@ -199,11 +200,14 @@ def request(
         with open_request(req, timeout_seconds()) as response:
             result = decode_json(response.read(), path)
     except urllib.error.HTTPError as exc:
-        body = exc.read()
-        try:
-            detail = json.dumps(decode_json(body, path), ensure_ascii=False, separators=(",", ":"))
-        except ClientError:
-            detail = "response body omitted because it was not valid JSON"
+        if expose_error_body:
+            body = exc.read()
+            try:
+                detail = json.dumps(decode_json(body, path), ensure_ascii=False, separators=(",", ":"))
+            except ClientError:
+                detail = "response body omitted because it was not valid JSON"
+        else:
+            detail = "response body omitted because the request contains a private agent prompt"
         raise ClientError(f"HTTP {exc.code} from {path}: {detail}") from exc
     except (urllib.error.URLError, TimeoutError) as exc:
         raise RequestTransportError(f"Request to {path} failed: {exc}") from exc
@@ -263,6 +267,21 @@ def bounded_text(value: str | None, field: str, maximum: int) -> str | None:
     if len(stripped) > maximum:
         raise ClientError(f"{field} must be at most {maximum} characters")
     return stripped
+
+
+def read_bounded_text_file(path: str, field: str, maximum: int) -> str:
+    try:
+        size = os.path.getsize(path)
+    except OSError as exc:
+        raise ClientError(f"cannot read {field} file: {exc}") from exc
+    if size > maximum * 4:
+        raise ClientError(f"{field} file is too large")
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            value = handle.read(maximum + 1)
+    except (OSError, UnicodeError) as exc:
+        raise ClientError(f"cannot read {field} file as UTF-8: {exc}") from exc
+    return bounded_text(value, field, maximum) or ""
 
 
 def find_first(value: Any, keys: Sequence[str]) -> Any:
@@ -326,15 +345,17 @@ def command_call(args: argparse.Namespace) -> None:
         raise ClientError("agent_id must be a positive integer")
     idempotency_key = args.idempotency_key or f"china-call-{uuid.uuid4()}"
     payload: dict[str, Any] = {"phones": args.phone}
-    optionals = {
-        "agent_id": args.agent_id,
-        "user_requirement": build_call_requirement(args.task),
-        "model_engine": bounded_text(args.model_engine, "model_engine", 100),
-        "voice_id": bounded_text(args.voice_id, "voice_id", 100),
-        "volume": args.volume,
-        "speed": args.speed,
-        "emotion": bounded_text(args.emotion, "emotion", 100),
-    }
+    if args.agent_id is not None:
+        optionals = {"agent_id": args.agent_id}
+    else:
+        optionals = {
+            "user_requirement": build_call_requirement(args.task),
+            "model_engine": bounded_text(args.model_engine, "model_engine", 100),
+            "voice_id": bounded_text(args.voice_id, "voice_id", 100),
+            "volume": args.volume,
+            "speed": args.speed,
+            "emotion": bounded_text(args.emotion, "emotion", 100),
+        }
     payload.update({key: value for key, value in optionals.items() if value is not None})
     try:
         result = request(
@@ -366,6 +387,43 @@ def command_call(args: argparse.Namespace) -> None:
 
 def command_callinfo(args: argparse.Namespace) -> None:
     render_json(request("POST", "/api/v1/callinfo/search_callinfo", {"call_id": args.call_id}))
+
+
+def command_agents(_: argparse.Namespace) -> None:
+    render_json(request("GET", "/api/v1/callinfo/agents"))
+
+
+def command_agent_create(args: argparse.Namespace) -> None:
+    tools = []
+    for value in args.tools or ["end_call"]:
+        normalized = bounded_text(value, "tool", 100)
+        if normalized and normalized not in tools:
+            tools.append(normalized)
+    if len(tools) > 20:
+        raise ClientError("at most 20 tools may be configured")
+    payload = {
+        "name": bounded_text(args.name, "name", 100),
+        "description": bounded_text(args.description, "description", 500),
+        "agent_prompt": read_bounded_text_file(args.prompt_file, "agent prompt", 100000),
+        "greeting": bounded_text(args.greeting, "greeting", 2000),
+        "model_engine": bounded_text(args.model_engine, "model_engine", 255),
+        "voice_id": bounded_text(args.voice_id, "voice_id", 128),
+        "language": bounded_text(args.language, "language", 32),
+        "tts_speed": args.speed,
+        "tts_volume": args.volume,
+        "tts_emotion": bounded_text(args.emotion, "emotion", 64),
+        "enable_interruptions": not args.disable_interruptions,
+        "tools": tools,
+        "is_active": True,
+    }
+    render_json(
+        request(
+            "POST",
+            "/api/v1/callinfo/agents",
+            {key: value for key, value in payload.items() if value is not None},
+            expose_error_body=False,
+        )
+    )
 
 
 def iter_sse_lines(response: Any) -> Iterable[str]:
@@ -481,7 +539,17 @@ def command_doctor(_: argparse.Namespace) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Stepone AI China phone client")
+    parser = argparse.ArgumentParser(
+        description="Stepone AI China phone client",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""Examples:
+  ./stepone.sh agents
+  ./stepone.sh agent-create --name '会议提醒' --prompt-file ./agent-prompt.txt \\
+    --greeting '您好，我是 AI 助手。' --model-engine stepone-mini --voice-id v0001
+  ./stepone.sh call 13800138000 --agent-id 123 --confirm
+  ./stepone.sh call 13800138000 '提醒明天下午三点开会' --confirm
+""",
+    )
     parser.add_argument("--client-version", action="version", version=SKILL_VERSION)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -505,6 +573,26 @@ def build_parser() -> argparse.ArgumentParser:
     callinfo.add_argument("call_id", type=validate_call_id)
     callinfo.add_argument("--json", action="store_true", help=argparse.SUPPRESS)
     callinfo.set_defaults(func=command_callinfo)
+
+    agents = subparsers.add_parser("agents", help="list saved agents and their ids")
+    agents.set_defaults(func=command_agents)
+
+    agent_create = subparsers.add_parser(
+        "agent-create", help="create a saved agent from a local UTF-8 prompt file"
+    )
+    agent_create.add_argument("--name", required=True)
+    agent_create.add_argument("--prompt-file", required=True)
+    agent_create.add_argument("--greeting", required=True)
+    agent_create.add_argument("--description")
+    agent_create.add_argument("--model-engine", default="stepone-mini")
+    agent_create.add_argument("--voice-id", default="v0001")
+    agent_create.add_argument("--language", default="zh")
+    agent_create.add_argument("--volume", type=integer_between(0, 100), default=50)
+    agent_create.add_argument("--speed", type=integer_between(0, 100), default=50)
+    agent_create.add_argument("--emotion")
+    agent_create.add_argument("--tool", dest="tools", action="append")
+    agent_create.add_argument("--disable-interruptions", action="store_true")
+    agent_create.set_defaults(func=command_agent_create)
 
     stream = subparsers.add_parser("stream", help="stream live transcript events")
     stream.add_argument("call_id", type=validate_call_id)

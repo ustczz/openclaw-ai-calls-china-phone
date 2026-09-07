@@ -44,6 +44,7 @@ OpenClaw 会引导你注册 ClawCall、创建 API Key，并完成只读自检。
 - AI 呼入：配置欢迎语、接待提示词、共享呼入号码或独立呼入号码
 - 通话记录：查询状态、费用、转写和实时对话
 - 声音配置：选择模型、音色、语速、音量和情绪
+- 智能体管理：通过网页或 CLI 创建智能体、查看 ID，并按 ID 发起呼入/外呼
 - 安全控制：每次只拨一个号码，必须逐次确认后才会真实呼叫
 
 本 Skill 处理中国大陆手机号码，支持 11 位和 `+86` 格式。国际号码请使用
@@ -73,6 +74,12 @@ export STEPONEAI_CAMPAIGN="github-readme-v1014"
 ./stepone.sh balance
 ./stepone.sh engines
 ./stepone.sh voices
+./stepone.sh agents
+./stepone.sh agent-create \
+  --name "会议提醒" \
+  --prompt-file ./agent-prompt.txt \
+  --greeting "您好，我是 AI 助手。"
+./callout.sh "13800138000" --agent-id 123 --confirm
 ./callinfo.sh CALL_ID
 ./stream_chat.sh CALL_ID
 ./stepone.sh --help
@@ -83,13 +90,14 @@ export STEPONEAI_CAMPAIGN="github-readme-v1014"
 
 ## 呼入接待
 
-呼入功能当前通过网页控制台配置：
+呼入号码当前通过网页控制台配置；智能体也可以使用 `stepone.sh agent-create` 创建：
 
 1. 在[智能体](https://open-skill.steponeai.com/agents?utm_source=github&utm_medium=repository&utm_campaign=clawcall-china-v1014&utm_content=readme-agents)页面设置身份、开场白、业务范围、模型和音色。
 2. 在[呼入设置](https://open-skill.steponeai.com/inbound?utm_source=github&utm_medium=repository&utm_campaign=clawcall-china-v1014&utm_content=readme-inbound-setup)页面绑定共享号码白名单，或为独立号码选择默认智能体。
 3. 使用已授权的号码拨入，检查身份告知、打断、转写和通话记录。
 
-目前公开 API 不提供呼入号码绑定接口，Skill 不会猜测或绕过控制台配置。
+目前公开 API 不提供呼入号码绑定接口，Skill 不会猜测或绕过控制台配置。网页智能体卡片会展示
+可复制的智能体 ID，`stepone.sh agents` 也会返回同一 ID。
 
 ## 安全与合规
 

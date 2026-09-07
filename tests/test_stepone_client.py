@@ -6,6 +6,7 @@ import importlib.util
 import io
 import json
 import os
+import tempfile
 import types
 import unittest
 from pathlib import Path
@@ -71,7 +72,7 @@ class ApiConfigurationTests(unittest.TestCase):
         self.assertEqual(request.full_url, "https://domestic.example/status")
         self.assertEqual(headers["x-api-key"], "test-key")
         self.assertEqual(headers["x-skill-version"], "1.0.0")
-        self.assertEqual(headers["x-client-version"], "1.0.15")
+        self.assertEqual(headers["x-client-version"], "1.0.16")
         self.assertEqual(headers["x-client-platform"], "workbuddy")
         self.assertEqual(headers["x-campaign"], "launch-v2")
 
@@ -216,6 +217,76 @@ class SafetyTests(unittest.TestCase):
         ), self.assertRaisesRegex(CLIENT.ClientError, "outcome is unknown") as raised:
             CLIENT.command_call(args)
         self.assertIn("network-test-1", str(raised.exception))
+
+    def test_agent_id_wins_and_inline_overrides_are_not_sent(self):
+        args = types.SimpleNamespace(
+            confirm=True,
+            phone="13800138000",
+            task="这段任务应被忽略",
+            agent_id=17,
+            model_engine="ignored-model",
+            voice_id="ignored-voice",
+            volume=100,
+            speed=0,
+            emotion="ignored-emotion",
+            idempotency_key="agent-call-20260831",
+            wait=False,
+        )
+        with mock.patch.object(
+            CLIENT, "request", return_value={"success": True, "call_id": "call-1"}
+        ) as request, contextlib.redirect_stdout(io.StringIO()):
+            CLIENT.command_call(args)
+
+        self.assertEqual(
+            request.call_args.args[2],
+            {"phones": "13800138000", "agent_id": 17},
+        )
+
+    def test_agents_command_uses_authenticated_agent_endpoint(self):
+        with mock.patch.object(
+            CLIENT, "request", return_value={"success": True, "data": {"items": []}}
+        ) as request, contextlib.redirect_stdout(io.StringIO()):
+            CLIENT.command_agents(argparse.Namespace())
+
+        request.assert_called_once_with("GET", "/api/v1/callinfo/agents")
+
+    def test_agent_create_reads_prompt_file_and_returns_created_id(self):
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False) as handle:
+            handle.write("你是会议提醒智能体。")
+            prompt_path = handle.name
+        args = types.SimpleNamespace(
+            name="会议提醒",
+            prompt_file=prompt_path,
+            greeting="您好，我是 AI 助手。",
+            description="通知会议",
+            model_engine="stepone-mini",
+            voice_id="v0001",
+            language="zh",
+            speed=55,
+            volume=45,
+            emotion=None,
+            tools=None,
+            disable_interruptions=False,
+        )
+        try:
+            with mock.patch.object(
+                CLIENT,
+                "request",
+                return_value={"success": True, "data": {"id": 21}},
+            ) as request:
+                output = io.StringIO()
+                with contextlib.redirect_stdout(output):
+                    CLIENT.command_agent_create(args)
+        finally:
+            os.unlink(prompt_path)
+
+        method, path, payload = request.call_args.args
+        self.assertEqual((method, path), ("POST", "/api/v1/callinfo/agents"))
+        self.assertFalse(request.call_args.kwargs["expose_error_body"])
+        self.assertEqual(payload["agent_prompt"], "你是会议提醒智能体。")
+        self.assertEqual(payload["tools"], ["end_call"])
+        self.assertEqual(payload["tts_speed"], 55)
+        self.assertEqual(json.loads(output.getvalue())["data"]["id"], 21)
 
     def test_json_stream_output_is_sanitized(self):
         lines = [
